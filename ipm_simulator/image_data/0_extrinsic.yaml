@@ -1,0 +1,14 @@
+%YAML:1.0
+---
+# the transform from the cam0 coordinate system to the world coordinate system
+frame_id: cam0
+transform:
+  translation:
+    x: 0.0
+    y: 2.5
+    z: 1.05
+  rotation:
+    x: -0.866
+    y: 0.0
+    z: 0.0
+    w: 0.5

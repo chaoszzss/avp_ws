@@ -1,0 +1,13 @@
+<launch>
+
+  <!-- 启动 IPM 节点 -->
+  <node pkg="ipm_simulator" type="ipm_node" name="ipm_node" launch-prefix="gnome-terminal -e" />
+  
+  <!-- 启动语义分割节点 -->
+  <node pkg="ipm_segmentation" type="ipm_seg.py" name="ipm_segmentation" output="screen">
+    <param name="model_path" value="$(find ipm_segmentation)/models/model_final_v1_4000.pth" />
+  </node>
+  
+  <!-- 可视化工具 -->
+  <!-- <node pkg="rqt_image_view" type="rqt_image_view" name="segmentation_view" args="/semantic_segmentation" /> -->
+</launch>

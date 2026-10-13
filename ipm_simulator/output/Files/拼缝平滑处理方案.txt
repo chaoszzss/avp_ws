@@ -1,0 +1,70 @@
+• 拼缝处理
+
+  - 当前工程并没有额外的“后处理”接口来平滑接缝，真正负责融合的是 IPM::GenerateIPMImageImpl 与
+    BuildLookupTable（src/ipm_fun.cc:120 与 src/ipm_fun.cc:188）。每个 IPM 像素最多保留两台相机的贡献
+    (PixelLookupEntry)，在合成阶段做加权平均 (src/ipm_fun.cc:157-174)，这实际上就是边界平滑的核心。
+  - LUT 生成时会针对每个候选相机求三类权重并相乘：
+         综合权重排序后只保留 top-2，再用归一化因子 inv_weight_sum 进行线性混合（src/ipm_fun.cc:297-320），因
+         而过渡平滑且不会被噪声放大。
+  - preserve_labels 只在标签图模式下启用（src/ipm_fun.cc:149-154），它选取权重最高的一台相机，避免类标被混合；
+    因此平滑仅体现在 RGB 合成图，标签图则保持量化后的离散颜色。
+
+  - 工程自带的示例输出可直接引用：output/results1.png ~ results4.png 展示了四方向融合后的顶视图；IPM_Dataset/
+    label_test/*.png（如 visualization1.png, semantic_segmentation_visualization.png）是量化后的标签视图，可放
+    到附录或正文展示平滑后的分割效果。
+  - 若需要更“可量化”的图，可在 LUT 上做一次可视化：把 PixelLookupEntry 中的 weight 或 camera_idx 拉成热力图/区
+    域划分，显示各相机对拼缝贡献的权重分布，这样审稿人能直观看到过渡带是连续的。只需在合成循环里额外输出一张单
+    通道图即可。
+  - 生成可复现实验：在终端运行 rosrun ipm_simulator ipm_node，保存 /ipm_raw（平滑后的可视化）与 /ipm_label（量
+    化标签），再从同一帧导出原始单相机视角对比。论文图可以选取拼缝区域的裁切图 + 线性剖面（像素值 vs. 位置）来
+    展示平滑前后差异。
+  - 如果希望附带性能证据，可复用 CHANGELOG_OPTIMIZATION.md 中提到的时延数据，给出帧时延统计表或箱线图，说明这
+    种加权拼缝既平滑又实时。
+    
+    
+    
+------------
+热力图可视化
+• Blending Controls
+
+  - src/ipm_fun.cc:218 now toggles distance /图像中心/方向三类权重是否参与 LUT 生成，直接受 blending_strategy_
+    控制，支持真正的简单均值与混合加权对比。
+  - src/ipm_fun.h:55 内联实现了 SetBlendingStrategy 与 SetPostProcessingEnabled，切换策略会自动标记 LUT 失效，
+    从而重建。
+
+  导出程序
+
+  - src/ipm_weight_export.cpp:37 新增 ParseStrategy/StrategyToString，命令行第 4 参数可选 advanced|baseline|
+    weighted_simple|hybrid，便于在真机上导出不同策略下的权重图。
+
+  权重可视化脚本
+
+  - scripts/generate_weight_debug.py:9 加入 MODE_CONFIGS，--mode mixed 复现现有混合权重，--mode baseline 仅保
+    留距离权重，其余模式可做扩展；输出同名标签区分（如 synthetic01_mixed）。
+  - scripts/plot_ipm_weights.py:58 支持 --compare-tag，生成 3×6 面板展示基线 vs 混合及差分掩码（文件
+    weight_heatmap_<A>_vs_<B>.png）。
+
+  生成的结果
+
+  - output/weight_cam*_synthetic01_mixed.png 与 ..._baseline.png 系列为四路相机加权热力图；dominant_* 显示主导
+    相机分区；ipm_debug_* 展现合成图。
+  - output/weight_heatmap_synthetic01_mixed.png、weight_heatmap_synthetic01_baseline.png 为单策略面板；
+    weight_heatmap_synthetic01_mixed_vs_synthetic01_baseline.png 为消融对照及差分。
+
+  复现指引
+
+  - 生成混合 / 基线权重：
+    python3 scripts/generate_weight_debug.py --data-dir image_data --output-dir output --tag synthetic01_mixed
+    --mode mixed
+    python3 scripts/generate_weight_debug.py --data-dir image_data --output-dir output --tag
+    synthetic01_baseline --mode baseline
+  - 绘制可视化：
+    python3 scripts/plot_ipm_weights.py --folder output --tag synthetic01_mixed --out output
+    python3 scripts/plot_ipm_weights.py --folder output --tag synthetic01_mixed --compare-tag
+    synthetic01_baseline --out output
+
+  后续建议
+
+  1. 在真实数据上运行 ROS 节点时调用 SetBlendingStrategy(BlendingStrategy::SIMPLE_AVERAGE) / WEIGHTED_ADVANCED
+     和 ExportWeightDebugImages 抽帧导出对照。
+  2. 基于 weight_heatmap_*_vs_* 中的第三行差分区域，可进一步统计拼缝梯度或纹理指数，写入论文 Ablation 表格。

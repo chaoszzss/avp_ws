@@ -1,0 +1,8 @@
+<launch>
+    
+    <node name="avp_control" pkg="avp_control" type="avp_control" output="screen" />
+
+    <!-- <node name="avp_planning" pkg="avp_planning" type="avp_planning" /> -->
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find avp_control)/rviz_avp_control.rviz" />
+</launch>

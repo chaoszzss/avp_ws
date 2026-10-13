@@ -1,0 +1,11 @@
+<launch>
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find avp_localization)/launch/avp_localization.rviz" />
+
+    <node name="avp_localization" pkg="avp_localization" type="avp_localization" output="screen">
+        <param name="auto_run" type="bool" value="false" />
+        <param name="show_img" type="bool" value="true" />
+    </node>
+
+
+</launch>
+
